@@ -1,0 +1,112 @@
+# Governed semantic layer for the users table.
+# The business definition of every metric lives HERE, in a versioned
+# artifact, enforced by the query engine. It is not advisory prompt text.
+
+cubes:
+  - name: users
+    sql_table: modeled.users
+    description: >
+      Registered users of the product. Contains soft-deleted rows and
+      internal QA/test accounts. Never count raw rows for business
+      reporting; use the governed measures below.
+
+    dimensions:
+      - name: user_id
+        sql: user_id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+        description: "Lifecycle status: active, inactive, pending, churned."
+
+      - name: is_deleted
+        sql: is_deleted
+        type: boolean
+        description: "Soft-delete flag. Deleted rows are excluded from all official metrics."
+
+      - name: is_test_account
+        sql: is_test_account
+        type: boolean
+        description: "Internal QA account. Excluded from all official metrics."
+
+      - name: plan
+        sql: plan
+        type: string
+        description: "Billing plan: free, pro, enterprise. Plan does NOT define activity."
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+      - name: last_login_at
+        sql: last_login_at
+        type: time
+        description: "Last login date. NULL if the user never logged in. Login recency does NOT define activity."
+
+    measures:
+      - name: count
+        type: count
+        title: Raw Row Count
+        description: >
+          Total rows in the users table, INCLUDING soft-deleted rows and
+          test accounts. Not an official business metric. Do not use this
+          to answer questions about how many users the company has.
+
+      - name: active_users
+        type: count
+        title: Active Users
+        description: >
+          OFFICIAL METRIC. The company's canonical definition of an active
+          user: status = 'active', not soft-deleted, not a test account.
+          This is the number to report whenever anyone asks how many
+          active users we have.
+        filters:
+          - sql: "{CUBE}.status = 'active'"
+          - sql: "{CUBE}.is_deleted = false"
+          - sql: "{CUBE}.is_test_account = false"
+
+      - name: churned_users
+        type: count
+        title: Churned Users
+        description: >
+          OFFICIAL METRIC. Users with status = 'churned', excluding
+          soft-deleted rows and test accounts.
+        filters:
+          - sql: "{CUBE}.status = 'churned'"
+          - sql: "{CUBE}.is_deleted = false"
+          - sql: "{CUBE}.is_test_account = false"
+
+      - name: paying_users
+        type: count
+        title: Paying Users
+        description: >
+          OFFICIAL METRIC. Users on a paid plan (pro or enterprise),
+          excluding soft-deleted rows and test accounts. Payment status
+          is independent of activity status.
+        filters:
+          - sql: "{CUBE}.plan != 'free'"
+          - sql: "{CUBE}.is_deleted = false"
+          - sql: "{CUBE}.is_test_account = false"
+
+      - name: valid_users
+        type: count
+        title: Valid Users (Reporting Universe)
+        description: >
+          OFFICIAL DENOMINATOR. All users excluding soft-deleted rows and
+          test accounts. Use this as the denominator for every share or
+          ratio metric.
+        filters:
+          - sql: "{CUBE}.is_deleted = false"
+          - sql: "{CUBE}.is_test_account = false"
+
+      - name: active_share
+        type: number
+        title: Active Share
+        description: >
+          OFFICIAL METRIC. Percentage of the reporting universe that is
+          active. Computed as 100 * active_users / valid_users. This is
+          the number to report whenever anyone asks what share of our
+          users is active.
+        sql: "100.0 * {CUBE.active_users} / NULLIF({CUBE.valid_users}, 0)"

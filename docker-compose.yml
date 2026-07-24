@@ -1,0 +1,15 @@
+services:
+  cube:
+    image: cubejs/cube:latest
+    container_name: semantic-layer-demo-cube
+    ports:
+      - "4000:4000"
+    environment:
+      - CUBEJS_DEV_MODE=true
+      - CUBEJS_DB_TYPE=duckdb
+      - CUBEJS_DB_DUCKDB_DATABASE_PATH=/cube/conf/db/demo.duckdb
+      - CUBEJS_API_SECRET=demo-secret-do-not-use-in-prod
+    volumes:
+      # Directory mounts (not single-file mounts) for Windows/Docker Desktop reliability
+      - ./cube/model:/cube/conf/model
+      - ./db:/cube/conf/db

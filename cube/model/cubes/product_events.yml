@@ -1,0 +1,54 @@
+# The semantic layer builds on the modelled layer: this cube sits on the
+# curated view, and the MAU definition executes here as one governed
+# measure. Cube date ranges are end-inclusive whole days, so the
+# BETWEEN-timestamp boundary bug that raw SQL invites cannot happen.
+
+cubes:
+  - name: product_events
+    sql_table: modeled.vw_qualifying_events
+    description: >
+      Qualifying product events by valid users. Passive events
+      (email_opened), machine events (webhook_ping), soft-deleted users,
+      and test accounts are already excluded.
+
+    dimensions:
+      - name: event_id
+        sql: event_id
+        type: number
+        primary_key: true
+
+      - name: user_id
+        sql: user_id
+        type: number
+
+      - name: event_type
+        sql: event_type
+        type: string
+        description: "Qualifying types only: login, card_created, card_moved, report_viewed, api_call."
+
+      - name: occurred_at
+        sql: occurred_at
+        type: time
+        description: >
+          Event timestamp. Filter on this dimension with a date range to
+          select a calendar month.
+
+    measures:
+      - name: monthly_active_users
+        type: count_distinct
+        sql: user_id
+        title: Monthly Active Users
+        description: >
+          OFFICIAL METRIC. Distinct valid users with at least one
+          qualifying product event in the selected date range. For MAU
+          of a given month, query this measure with occurred_at filtered
+          to that calendar month. This is the number to report whenever
+          anyone asks about monthly active users.
+
+      - name: event_count
+        type: count
+        title: Qualifying Event Count
+        description: >
+          Number of qualifying product events. This counts events, not
+          users. Do not use it to answer questions about how many users
+          were active.

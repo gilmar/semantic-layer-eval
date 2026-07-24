@@ -1,0 +1,27 @@
+{
+  "active_count": {
+    "total_rows": 300,
+    "status_active_only": 174,
+    "status_active_excl_deleted": 164,
+    "status_active_excl_test": 165,
+    "governed_active_users": 157,
+    "any_status_excl_deleted": 281,
+    "valid_universe": 271,
+    "active_or_pending_excl_deleted_test": 190,
+    "not_churned_not_inactive": 211,
+    "paying_plan_any_status": 149,
+    "paying_and_status_active": 87
+  },
+  "mau_june_2026": {
+    "governed_mau": 160,
+    "mau_incl_passive_events": 162,
+    "mau_incl_test_and_deleted": 182,
+    "mau_all_users_all_events": 184,
+    "mau_between_boundary_bug": 158,
+    "mau_requiring_status_active": 155,
+    "event_rows_qualifying_june_valid": 1545,
+    "event_rows_all_june": 2391,
+    "confused_with_status_active_count": 174,
+    "confused_with_governed_active_users": 157
+  }
+}
