@@ -57,10 +57,10 @@ QUESTIONS = [
     },
 ]
 
-# Models to evaluate. Wire additional providers in providers.py.
+# Models to evaluate. Any OpenRouter slug works; see https://openrouter.ai/models
 MODELS = [
-    "claude-haiku-4-5-20251001",
-    "claude-sonnet-4-6",
+    "anthropic/claude-haiku-4.5",
+    "anthropic/claude-sonnet-4.6",
 ]
 
 # Repetitions per (question, language, arm, model). Variance across runs
@@ -78,13 +78,13 @@ CUBE_URL = "http://localhost:4000"
 # Dev mode accepts any bearer token; this value is irrelevant but required.
 CUBE_TOKEN = "demo"
 
-# USD per million tokens, standard API rates (no caching, no batch).
-# Pinned July 2026 from https://platform.claude.com/docs/en/about-claude/pricing
+# USD per million tokens, OpenRouter list rates (no caching, no batch).
+# Pinned July 2026 from https://openrouter.ai/models
 # Prices change; verify before quoting numbers from a run. Every model in
 # MODELS must have an entry here or the run refuses to start.
 PRICING = {
-    "claude-haiku-4-5-20251001": {"input_per_mtok": 1.00, "output_per_mtok": 5.00},
-    "claude-sonnet-4-6": {"input_per_mtok": 3.00, "output_per_mtok": 15.00},
+    "anthropic/claude-haiku-4.5": {"input_per_mtok": 1.00, "output_per_mtok": 5.00},
+    "anthropic/claude-sonnet-4.6": {"input_per_mtok": 3.00, "output_per_mtok": 15.00},
 }
 
 RESULTS_DIR = "results"

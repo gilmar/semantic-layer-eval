@@ -82,7 +82,7 @@ The model emits a small JSON Cube query: one measure, optionally a time dimensio
 
 ## Quickstart
 
-Requirements: [uv](https://docs.astral.sh/uv/), Python 3.10+, Docker Desktop, an Anthropic API key. Same commands in PowerShell.
+Requirements: [uv](https://docs.astral.sh/uv/), Python 3.10+, Docker Desktop, an [OpenRouter](https://openrouter.ai/) API key. Same commands in PowerShell.
 
 ```
 uv sync
@@ -96,8 +96,8 @@ uv run python db/load_duckdb.py
 # 3. Start the semantic layer (playground at http://localhost:4000)
 docker compose up -d
 
-# 4. Run the eval
-set ANTHROPIC_API_KEY=sk-ant-...        (PowerShell: $env:ANTHROPIC_API_KEY="sk-ant-...")
+# 4. Put your OpenRouter key in .env, then run the eval
+#    cp .env.example .env   # if needed, then edit OPENROUTER_API_KEY=
 uv run python eval/run_eval.py
 ```
 
@@ -119,7 +119,7 @@ The report shows input and output tokens per call by question and arm, with an i
 
 ## Cost analysis
 
-Every call is priced from API-reported usage at the standard rates pinned in `eval/config.py`, sourced from the official pricing page in July 2026. Rates change; update `PRICING` before quoting numbers, and the run refuses to start if a configured model has no pricing entry. Calls whose SQL or JSON fails to resolve are still priced, because wrong answers cost money too.
+Every call is priced from API-reported usage at the OpenRouter list rates pinned in `eval/config.py`, sourced from openrouter.ai/models in July 2026. Rates change; update `PRICING` before quoting numbers, and the run refuses to start if a configured model has no pricing entry. Calls whose SQL or JSON fails to resolve are still priced, because wrong answers cost money too.
 
 The report gives cost by arm and model and by question and arm: calls, correct, total spend, wasted spend (runs that did not produce the governed answer), and the headline metric, **cost per correct answer**. Per-call cost rewards the CSV arm for being a single round trip; per-correct cost exposes what the spend actually buys. When accuracy differences stack on top of the footprints, the cost-per-correct spread is usually wider than the accuracy spread alone.
 
@@ -135,4 +135,4 @@ Two tables, three questions, one join. Real ambiguity compounds further: multi-h
 
 ## Extensions
 
-Add an OpenAI or Gemini branch in `providers.py` for cross-vendor divergence. Add a second time grain (weekly active users) to show that each new grain multiplies the raw-SQL interpretation space while adding one measure to the layer.
+Add OpenAI or Gemini OpenRouter slugs to `MODELS` in `eval/config.py` (and matching `PRICING` entries) for cross-vendor divergence. Add a second time grain (weekly active users) to show that each new grain multiplies the raw-SQL interpretation space while adding one measure to the layer.
