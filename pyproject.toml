@@ -1,0 +1,9 @@
+[project]
+name = "semantic-layer-eval"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.40",
+    "duckdb>=1.0",
+    "requests>=2.31",
+]

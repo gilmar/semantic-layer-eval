@@ -82,23 +82,23 @@ The model emits a small JSON Cube query: one measure, optionally a time dimensio
 
 ## Quickstart
 
-Requirements: Python 3.10+, Docker Desktop, an Anthropic API key. Same commands in PowerShell.
+Requirements: [uv](https://docs.astral.sh/uv/), Python 3.10+, Docker Desktop, an Anthropic API key. Same commands in PowerShell.
 
 ```
-pip install -r requirements.txt
+uv sync
 
 # 1. Generate the data (prints both fingerprint tables)
-python data/generate_data.py
+uv run python data/generate_data.py
 
 # 2. Build demo.duckdb with BOTH versions (raw and modeled schemas)
-python db/load_duckdb.py
+uv run python db/load_duckdb.py
 
 # 3. Start the semantic layer (playground at http://localhost:4000)
 docker compose up -d
 
 # 4. Run the eval
 set ANTHROPIC_API_KEY=sk-ant-...        (PowerShell: $env:ANTHROPIC_API_KEY="sk-ant-...")
-python eval/run_eval.py
+uv run python eval/run_eval.py
 ```
 
 Defaults produce 200 API calls (10 arm cells x 2 models x 2 languages x 5 runs), roughly one US dollar at pinned rates, dominated by the CSV arm on Sonnet. Trim `LANGUAGES`, `MODELS`, or `N_RUNS` in `eval/config.py` to cut cost. Outputs land in `results/results.csv` (every run with raw responses, token counts, and per-call cost) and `results/report.md` (per-question summary tables, the token footprint and cost analyses, and all three fingerprint tables).
