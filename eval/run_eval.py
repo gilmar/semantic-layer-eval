@@ -42,12 +42,17 @@ FP_TITLES = {
     "active_count": "Active users (count)",
     "active_share": "Active share (percent)",
     "mau": "Monthly active users, June 2026 (count)",
+    "wau": "Weekly active users, week of June 22, 2026 (count)",
 }
-FP_KINDS = {"active_count": "count", "active_share": "percent", "mau": "count"}
+FP_KINDS = {
+    "active_count": "count", "active_share": "percent",
+    "mau": "count", "wau": "count",
+}
 FP_GT_KEYS = {
     "active_count": "governed_active_users",
     "active_share": "governed_active / valid_universe",
     "mau": "governed_mau",
+    "wau": "governed_wau",
 }
 
 
@@ -109,7 +114,8 @@ def run_one(arm, model, question_text, cube_meta):
     usage = {"input_tokens": 0, "output_tokens": 0}
     try:
         reply = providers.complete(
-            model, prompt, config.TEMPERATURE, config.MAX_TOKENS
+            model, prompt, config.TEMPERATURE, config.MAX_TOKENS,
+            provider=config.PROVIDER_ROUTING.get(model),
         )
         raw = reply["text"]
         usage = {
@@ -137,13 +143,18 @@ def main():
     count_fp = arms.compute_count_fingerprints()
     share_fp = arms.compute_share_fingerprints(count_fp)
     mau_fp = arms.compute_mau_fingerprints(count_fp)
-    fp_sets = {"active_count": count_fp, "active_share": share_fp, "mau": mau_fp}
+    wau_fp = arms.compute_wau_fingerprints(count_fp, mau_fp)
+    fp_sets = {
+        "active_count": count_fp, "active_share": share_fp,
+        "mau": mau_fp, "wau": wau_fp,
+    }
     ground_truths = {
         key: float(fp_sets[key][FP_GT_KEYS[key]]) for key in fp_sets
     }
     print(f"Ground truth, active users:       {int(ground_truths['active_count'])}")
     print(f"Ground truth, active share:       {ground_truths['active_share']:.4f}%")
-    print(f"Ground truth, MAU June 2026:      {int(ground_truths['mau'])}\n")
+    print(f"Ground truth, MAU June 2026:      {int(ground_truths['mau'])}")
+    print(f"Ground truth, WAU week of Jun 22: {int(ground_truths['wau'])}\n")
 
     needs_cube = any("semantic_layer" in q["arms"] for q in config.QUESTIONS)
     cube_meta = None

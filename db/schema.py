@@ -96,7 +96,8 @@ VIEW_QUALIFYING_COMMENT = (
     "Curated fact view. Qualifying product events (passive and machine "
     "events removed) by valid users (soft-deleted and test accounts "
     "removed). One row per event. The count of DISTINCT user_id over a "
-    "calendar month yields the official Monthly Active Users metric."
+    "calendar month yields the official Monthly Active Users metric; over "
+    "an ISO week (Monday through Sunday) it yields Weekly Active Users."
 )
 
 # (metric_name, owner, definition, source_object)
@@ -126,6 +127,15 @@ METRICS_DICTIONARY = [
         "vw_qualifying_events",
     ),
     (
+        "weekly_active_users",
+        "Growth Analytics",
+        "Count of distinct valid users (excluding soft-deleted rows and test "
+        "accounts) with at least one qualifying product event in the week. "
+        "Weeks are ISO weeks: Monday 00:00 through the end of Sunday. "
+        "Qualifying events exclude email_opened and webhook_ping.",
+        "vw_qualifying_events",
+    ),
+    (
         "churned_users",
         "Growth Analytics",
         "Count of users with status = churned, excluding soft-deleted rows and "
@@ -137,6 +147,14 @@ METRICS_DICTIONARY = [
         "Finance",
         "Count of users on the pro or enterprise plan, excluding soft-deleted "
         "rows and test accounts.",
+        "",
+    ),
+    (
+        "engaged_users",
+        "Growth Analytics",
+        "Count of valid users (excluding soft-deleted rows and test accounts) "
+        "with at least 3 qualifying product events in the calendar month. "
+        "Qualifying events exclude email_opened and webhook_ping.",
         "",
     ),
 ]
@@ -174,8 +192,13 @@ def build_raw(con, csv_path: Path, events_csv_path: Path,
 
 
 def build_modeled(con, csv_path: Path, events_csv_path: Path,
-                  schema: str | None = None) -> None:
-    """The documented version: comments, dictionary, curated views."""
+                  schema: str | None = None, views: bool = True) -> None:
+    """The documented version: comments, dictionary, curated views.
+
+    views=False builds the prose-only variant (steelman v2's
+    documented_prose arm): same comments and dictionary, no views, and
+    every dictionary source_object blanked so the prose never points at
+    an object that does not exist."""
     p = _prefix(schema)
     if schema:
         con.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
@@ -192,9 +215,12 @@ def build_modeled(con, csv_path: Path, events_csv_path: Path,
         "metric_name VARCHAR, owner VARCHAR, definition VARCHAR, "
         "source_object VARCHAR)"
     )
+    dictionary = METRICS_DICTIONARY if views else [
+        (name, owner, definition, "") for name, owner, definition, _ in METRICS_DICTIONARY
+    ]
     con.executemany(
         f"INSERT INTO {p}metrics_dictionary VALUES (?, ?, ?, ?)",
-        METRICS_DICTIONARY,
+        dictionary,
     )
     con.execute(
         f"COMMENT ON TABLE {p}metrics_dictionary IS "
@@ -207,6 +233,9 @@ def build_modeled(con, csv_path: Path, events_csv_path: Path,
     con.execute(f"COMMENT ON TABLE {p}events IS '{EVENTS_TABLE_COMMENT}'")
     for col, comment in EVENTS_COLUMN_COMMENTS.items():
         con.execute(f"COMMENT ON COLUMN {p}events.{col} IS '{comment}'")
+
+    if not views:
+        return
 
     con.execute(
         f"CREATE VIEW {p}vw_active_users AS "

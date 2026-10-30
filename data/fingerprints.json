@@ -23,5 +23,119 @@
     "event_rows_all_june": 2391,
     "confused_with_status_active_count": 174,
     "confused_with_governed_active_users": 157
+  },
+  "wau_week_of_2026_06_22": {
+    "governed_wau": 136,
+    "wau_incl_passive_events": 144,
+    "wau_incl_test_and_deleted": 155,
+    "wau_all_users_all_events": 165,
+    "wau_between_boundary_bug": 131,
+    "wau_sunday_start_week": 138,
+    "wau_sunday_start_between_bug": 132,
+    "wau_week_number_any_year": 146,
+    "wau_requiring_status_active": 133,
+    "wau_status_active_incl_passive": 141,
+    "event_rows_qualifying_week_valid": 382,
+    "event_rows_all_week": 589,
+    "confused_with_governed_mau": 160,
+    "confused_with_status_active_count": 174,
+    "confused_with_governed_active_users": 157
+  },
+  "b1_pro_mau_june_2026": {
+    "governed_pro_mau": 56,
+    "paid_plan_mau": 79,
+    "pro_mau_incl_passive_events": 57,
+    "pro_mau_no_exclusions": 67,
+    "pro_mau_requiring_status_active": 53,
+    "pro_mau_between_boundary_bug": 55,
+    "pro_status_active_count": 54,
+    "event_rows_pro_june": 541,
+    "confused_with_governed_mau": 160
+  },
+  "c1_paying_active_share_june_2026": {
+    "governed_paid_mau / valid_paid_users": 58.95522388059702,
+    "governed_paid_mau / all_paid_rows": 53.02013422818792,
+    "governed_paid_mau / valid_universe": 29.15129151291513,
+    "paid_mau_incl_passive / valid_paid_users": 60.44776119402985,
+    "paid_mau_incl_passive / all_paid_rows": 54.36241610738255,
+    "paid_mau_incl_passive / valid_universe": 29.88929889298893,
+    "paid_mau_no_exclusions / valid_paid_users": 67.91044776119404,
+    "paid_mau_no_exclusions / all_paid_rows": 61.07382550335571,
+    "paid_mau_no_exclusions / valid_universe": 33.579335793357934,
+    "pro_mau / valid_paid_users": 41.791044776119406,
+    "pro_mau / all_paid_rows": 37.58389261744966,
+    "pro_mau / valid_universe": 20.66420664206642,
+    "pro_mau / valid_pro_users": 60.869565217391305,
+    "inverted: governed_paid_mau / governed_mau": 49.375
+  },
+  "d1_mau_by_plan_june_2026": {
+    "governed_mau_by_plan": {
+      "free": 81,
+      "pro": 56,
+      "enterprise": 23
+    },
+    "mau_by_plan_incl_passive_events": {
+      "free": 81,
+      "pro": 57,
+      "enterprise": 24
+    },
+    "mau_by_plan_no_exclusions": {
+      "free": 91,
+      "pro": 67,
+      "enterprise": 24
+    },
+    "mau_by_plan_between_boundary_bug": {
+      "free": 80,
+      "pro": 55,
+      "enterprise": 23
+    },
+    "event_rows_by_plan": {
+      "free": 762,
+      "pro": 541,
+      "enterprise": 242
+    },
+    "status_active_count_by_plan": {
+      "free": 79,
+      "pro": 54,
+      "enterprise": 24
+    }
+  },
+  "e1_mau_by_month_q2_2026": {
+    "governed_mau_by_month": {
+      "2026-04": 53,
+      "2026-05": 157,
+      "2026-06": 160
+    },
+    "mau_by_month_incl_passive_events": {
+      "2026-04": 63,
+      "2026-05": 158,
+      "2026-06": 162
+    },
+    "mau_by_month_no_exclusions": {
+      "2026-04": 68,
+      "2026-05": 179,
+      "2026-06": 182
+    },
+    "mau_by_month_between_boundary_bug": {
+      "2026-04": 53,
+      "2026-05": 157,
+      "2026-06": 158
+    },
+    "event_rows_by_month": {
+      "2026-04": 89,
+      "2026-05": 856,
+      "2026-06": 1545
+    },
+    "distinct_users_whole_quarter": 165
+  },
+  "f1_engaged_users_june_2026": {
+    "governed_engaged_users": 153,
+    "engaged_strictly_more_than_3": 149,
+    "engaged_incl_passive_events": 155,
+    "engaged_no_exclusions": 173,
+    "engaged_all_time": 236,
+    "engaged_between_boundary_bug": 152,
+    "event_rows_qualifying_june_valid": 1545,
+    "confused_with_governed_mau": 160
   }
 }

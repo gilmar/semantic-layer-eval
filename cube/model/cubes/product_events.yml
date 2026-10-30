@@ -1,7 +1,9 @@
 # The semantic layer builds on the modelled layer: this cube sits on the
-# curated view, and the MAU definition executes here as one governed
-# measure. Cube date ranges are end-inclusive whole days, so the
-# BETWEEN-timestamp boundary bug that raw SQL invites cannot happen.
+# curated view, and the MAU and WAU definitions execute here as governed
+# measures. Adding the weekly grain cost one measure; the population,
+# event filtering, distinctness, and date semantics are shared. Cube
+# date ranges are end-inclusive whole days, so the BETWEEN-timestamp
+# boundary bug that raw SQL invites cannot happen.
 
 cubes:
   - name: product_events
@@ -10,6 +12,13 @@ cubes:
       Qualifying product events by valid users. Passive events
       (email_opened), machine events (webhook_ping), soft-deleted users,
       and test accounts are already excluded.
+
+    # Structural, declared once: lets any users dimension (plan, status)
+    # slice any event measure. Not a per-question artifact.
+    joins:
+      - name: users
+        sql: "{CUBE}.user_id = {users}.user_id"
+        relationship: many_to_one
 
     dimensions:
       - name: event_id
@@ -31,7 +40,7 @@ cubes:
         type: time
         description: >
           Event timestamp. Filter on this dimension with a date range to
-          select a calendar month.
+          select a calendar month or an ISO week (Monday through Sunday).
 
     measures:
       - name: monthly_active_users
@@ -44,6 +53,18 @@ cubes:
           of a given month, query this measure with occurred_at filtered
           to that calendar month. This is the number to report whenever
           anyone asks about monthly active users.
+
+      - name: weekly_active_users
+        type: count_distinct
+        sql: user_id
+        title: Weekly Active Users
+        description: >
+          OFFICIAL METRIC. Distinct valid users with at least one
+          qualifying product event in the selected week. Company weeks
+          are ISO weeks, Monday through Sunday. For WAU of a given week,
+          query this measure with occurred_at filtered from that week's
+          Monday to its Sunday. This is the number to report whenever
+          anyone asks about weekly active users.
 
       - name: event_count
         type: count

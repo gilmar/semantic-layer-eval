@@ -1,0 +1,52 @@
+# One row per (valid user, calendar month) with that user's qualifying
+# event count. It exists for one governed metric, engaged_users, and is
+# the Cube-side counterpart of a single metrics_dictionary row: equal
+# authoring effort on both sides (steelman v2, rule R1). No warehouse view
+# encodes this metric; the documented arms get the prose only.
+
+cubes:
+  - name: user_months
+    sql: >
+      SELECT user_id,
+             date_trunc('month', occurred_at) AS month,
+             count(*) AS event_count
+      FROM modeled.vw_qualifying_events
+      GROUP BY 1, 2
+    description: >
+      Valid users per calendar month with their count of qualifying
+      product events. Passive events, machine events, soft-deleted users,
+      and test accounts are already excluded.
+
+    dimensions:
+      - name: id
+        sql: "CAST({CUBE}.user_id AS VARCHAR) || '-' || CAST({CUBE}.month AS VARCHAR)"
+        type: string
+        primary_key: true
+
+      - name: user_id
+        sql: user_id
+        type: number
+
+      - name: month
+        sql: month
+        type: time
+        description: >
+          First day of the calendar month. Filter on this dimension with a
+          date range covering the month.
+
+      - name: event_count
+        sql: event_count
+        type: number
+        description: Qualifying product events by the user in that month.
+
+    measures:
+      - name: engaged_users
+        type: count
+        title: Engaged Users
+        description: >
+          OFFICIAL METRIC. Valid users with at least 3 qualifying product
+          events in the calendar month. Query this measure with
+          user_months.month filtered to the month. This is the number to
+          report whenever anyone asks how many engaged users we had.
+        filters:
+          - sql: "{CUBE}.event_count >= 3"

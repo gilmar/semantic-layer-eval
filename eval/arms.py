@@ -21,8 +21,8 @@ The two SQL arms differ in exactly one variable: documentation.
 The semantic arm speaks the real protocol: the model emits a small JSON
 Cube query (one measure, optionally a time dimension date range), the
 harness sends it to Cube, Cube executes. This is how agents talk to a
-semantic layer over MCP in practice, and it is what makes the June
-question answerable through the layer.
+semantic layer over MCP in practice, and it is what makes the June and
+week questions answerable through the layer.
 """
 
 import csv
@@ -51,9 +51,9 @@ def _connect_raw():
     return con
 
 
-def _connect_modeled():
+def _connect_modeled(views: bool = True):
     con = duckdb.connect()
-    schema.build_modeled(con, CSV_PATH, EVENTS_CSV_PATH)
+    schema.build_modeled(con, CSV_PATH, EVENTS_CSV_PATH, views=views)
     return con
 
 
@@ -121,10 +121,11 @@ TABLE events
 No table comments, column comments, documentation tables, or curated views exist in this database."""
 
 
-def render_modeled_docs() -> str:
+def render_modeled_docs(views: bool = True) -> str:
     """Everything the model sees comes out of the live catalog, so the
-    documentation shown is provably the documentation stored."""
-    con = _connect_modeled()
+    documentation shown is provably the documentation stored.
+    views=False renders the prose-only warehouse (steelman v2)."""
+    con = _connect_modeled(views=views)
     try:
         tables = []
         for table in ("users", "events"):
@@ -135,12 +136,12 @@ def render_modeled_docs() -> str:
             cols = _render_columns(con, table, with_comments=True)
             tables.append(f"TABLE {table}\n  comment: {comment}\n{cols}")
 
-        views = []
+        view_parts = []
         for name, comment, sql in con.execute(
             "SELECT view_name, comment, sql FROM duckdb_views() "
             "WHERE NOT internal ORDER BY view_name"
         ).fetchall():
-            views.append(f"VIEW {name}\n  comment: {comment}\n  definition: {sql}")
+            view_parts.append(f"VIEW {name}\n  comment: {comment}\n  definition: {sql}")
 
         dict_rows = con.execute(
             "SELECT metric_name, owner, definition, source_object "
@@ -155,11 +156,15 @@ def render_modeled_docs() -> str:
         for name, owner, definition, src in dict_rows
     )
 
-    parts = ["""This warehouse is well modelled and documented. Everything below is rendered
-live from the database catalog (comments, dictionary rows, and view DDL are
+    stored = ("comments, dictionary rows, and view DDL are" if views
+              else "comments and dictionary rows are")
+    parts = [f"""This warehouse is well modelled and documented. Everything below is rendered
+live from the database catalog ({stored}
 stored in the warehouse itself)."""]
     parts.extend(tables)
-    parts.extend(views)
+    parts.extend(view_parts)
+    if not views:
+        parts.append("No curated views exist in this database.")
     parts.append(
         f"TABLE metrics_dictionary (official metric definitions, full contents):\n{dictionary}"
     )
@@ -418,6 +423,61 @@ def compute_mau_fingerprints(count_fp: dict) -> dict:
             "SELECT count(*) " + _VALID_JOIN + _QUALIFYING + _IN_JUNE),
         "event_rows_all_june": q(
             "SELECT count(*) FROM events e WHERE true " + _IN_JUNE),
+        "confused_with_status_active_count": count_fp["status_active_only"],
+        "confused_with_governed_active_users": count_fp["governed_active_users"],
+    }
+    con.close()
+    return fp
+
+
+_WEEK = ("TIMESTAMP '2026-06-22'", "TIMESTAMP '2026-06-29'")  # ISO week 26
+_SUNDAY_WEEK = ("TIMESTAMP '2026-06-21'", "TIMESTAMP '2026-06-28'")
+_IN_WEEK = f"AND e.occurred_at >= {_WEEK[0]} AND e.occurred_at < {_WEEK[1]}"
+
+
+def compute_wau_fingerprints(count_fp: dict, mau_fp: dict) -> dict:
+    """WAU for the week of June 22, 2026 under every plausible
+    interpretation. The MAU traps carry over to the new grain, and the
+    week adds Sunday-start weeks, a Sunday boundary bug, and ISO week
+    numbers matched without a year."""
+    con = _connect_raw()
+    q = lambda sql: con.execute(sql).fetchone()[0]  # noqa: E731
+    fp = {
+        "governed_wau": q(
+            "SELECT count(DISTINCT e.user_id) "
+            + _VALID_JOIN + _QUALIFYING + _IN_WEEK),
+        "wau_incl_passive_events": q(
+            "SELECT count(DISTINCT e.user_id) " + _VALID_JOIN + _IN_WEEK),
+        "wau_incl_test_and_deleted": q(
+            "SELECT count(DISTINCT user_id) FROM events e WHERE true "
+            + _QUALIFYING + _IN_WEEK),
+        "wau_all_users_all_events": q(
+            "SELECT count(DISTINCT user_id) FROM events e WHERE true " + _IN_WEEK),
+        "wau_between_boundary_bug": q(
+            "SELECT count(DISTINCT e.user_id) " + _VALID_JOIN + _QUALIFYING
+            + f"AND e.occurred_at BETWEEN {_WEEK[0]} AND TIMESTAMP '2026-06-28'"),
+        "wau_sunday_start_week": q(
+            "SELECT count(DISTINCT e.user_id) " + _VALID_JOIN + _QUALIFYING
+            + f"AND e.occurred_at >= {_SUNDAY_WEEK[0]} "
+            f"AND e.occurred_at < {_SUNDAY_WEEK[1]}"),
+        "wau_sunday_start_between_bug": q(
+            "SELECT count(DISTINCT e.user_id) " + _VALID_JOIN + _QUALIFYING
+            + f"AND e.occurred_at BETWEEN {_SUNDAY_WEEK[0]} "
+            "AND TIMESTAMP '2026-06-27'"),
+        "wau_week_number_any_year": q(
+            "SELECT count(DISTINCT e.user_id) " + _VALID_JOIN + _QUALIFYING
+            + "AND week(e.occurred_at) = 26"),
+        "wau_requiring_status_active": q(
+            "SELECT count(DISTINCT e.user_id) "
+            + _VALID_JOIN + "AND u.status = 'active' " + _QUALIFYING + _IN_WEEK),
+        "wau_status_active_incl_passive": q(
+            "SELECT count(DISTINCT e.user_id) "
+            + _VALID_JOIN + "AND u.status = 'active' " + _IN_WEEK),
+        "event_rows_qualifying_week_valid": q(
+            "SELECT count(*) " + _VALID_JOIN + _QUALIFYING + _IN_WEEK),
+        "event_rows_all_week": q(
+            "SELECT count(*) FROM events e WHERE true " + _IN_WEEK),
+        "confused_with_governed_mau": mau_fp["governed_mau"],
         "confused_with_status_active_count": count_fp["status_active_only"],
         "confused_with_governed_active_users": count_fp["governed_active_users"],
     }

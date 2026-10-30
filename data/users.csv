@@ -1,5 +1,5 @@
 user_id,email,full_name,status,is_deleted,is_test_account,plan,created_at,last_login_at
-1,diego.almeida1@acme-corp.com,Diego Almeida,inactive,false,false,free,2023-05-12,2026-02-02
+1,diego.almeida1@acme-corp.com,Diego Almeida,inactive,false,false,pro,2023-05-12,2026-02-02
 2,thiago.silva2@acme-corp.com,Thiago Silva,active,false,false,pro,2023-04-09,2026-06-06
 3,sofia.silva3@acme-corp.com,Sofia Silva,active,false,false,free,2025-07-10,2026-04-03
 4,nicolas.pereira4@acme-corp.com,Nicolas Pereira,active,false,false,free,2024-04-14,2026-06-19
@@ -15,7 +15,7 @@ user_id,email,full_name,status,is_deleted,is_test_account,plan,created_at,last_l
 14,nicolas.moraes14@acme-corp.com,Nicolas Moraes,active,false,false,pro,2023-04-25,2026-03-13
 15,ana.dias15@acme-corp.com,Ana Dias,inactive,false,false,pro,2025-10-16,2025-10-16
 16,nicolas.gomes16@acme-corp.com,Nicolas Gomes,active,false,false,free,2023-08-11,2026-03-26
-17,felipe.vieira17@acme-corp.com,Felipe Vieira,churned,false,false,pro,2025-04-20,2025-11-27
+17,felipe.vieira17@acme-corp.com,Felipe Vieira,churned,false,false,free,2025-04-20,2025-11-27
 18,lucas.gomes18@acme-corp.com,Lucas Gomes,active,false,false,free,2024-08-07,2026-04-30
 19,ana.dias19@acme-corp.com,Ana Dias,churned,false,false,free,2026-02-03,2026-02-03
 20,thiago.costa20@acme-corp.com,Thiago Costa,active,true,false,pro,2025-09-17,2026-06-15
