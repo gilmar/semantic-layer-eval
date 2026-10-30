@@ -32,6 +32,19 @@ Where this leaves my position: on a small catalog the model can see in full, a w
 
 Caveats: one synthetic benchmark; the same author wrote the questions and the artifacts. The v1 eval (`eval/run_eval.py`) has not been run in full; its Q1, Q3, and Q4 are included in v2 as A1, A2, and E2. Full analysis: `docs/steelman-v2-results.md`.
 
+### Post-run addition: spreadsheet in context (2026-10-30)
+
+Pasting a spreadsheet into a model's context is how many people work, so I added that comparison after the main results, with its expectations pre-registered in the spec before running. Two single-shot arms got the whole `users.csv` (300 rows): `csv_raw` with no documentation, and `csv_documented` with the users column notes and the full metrics dictionary. They ran on the two questions the spreadsheet alone can answer, and A3 also ran on the four core arms (480 calls, $4.74 at list rates).
+
+| question | undocumented SQL | documented SQL (prose / views) | semantic layer | spreadsheet | spreadsheet + docs |
+|---|---|---|---|---|---|
+| active users | 77% | 100% / 100% | 100% | 43% | 50% |
+| active share | 62% | 100% / 100% | 100% | 7% | 47% |
+
+Without documentation, the spreadsheet fails on definitions the way undocumented SQL does. With documentation, the definitions are right but most models miscount 300 rows. Only the models that reason before answering (GPT-6.1 Sol and Terra) were reliable; Claude, without extended thinking, was wrong 38 of 40 times. Per correct answer, the documented spreadsheet cost 27x the semantic layer.
+
+Against a spreadsheet in context, an interface where an engine executes the definition is a large improvement, whether that engine runs documented SQL or the semantic layer. Two parser bugs found after this run (decimal commas, and numbers taken from Claude's visible working) were fixed. Every episode was re-scored from its saved reply. Each fix moved answers from wrong to correct, and only on the spreadsheet arms. Details: `docs/steelman-v2-results.md`.
+
 ## The two versions
 
 `db/schema.py` is the single source of truth. Both the Cube-facing database and the harness environments are built from it, so the documentation a model sees is provably the documentation stored in the catalog.
@@ -212,9 +225,11 @@ v1's documented arm passed every smoke call because its curated views were writt
 
 It adds a prose-only arm (`documented_prose`, comments and dictionary with no views) and an agentic mode, where SQL agents may probe and retry with `run_sql` and the semantic agent uses `cube_load`.
 
+A post-run addition puts a spreadsheet in the model's context. Two single-shot arms on the questions `users.csv` alone can answer: `csv_raw` (the spreadsheet only) and `csv_documented` (spreadsheet, column notes, and metrics dictionary). They run on A1 and on A3, active share, v1's Q2.
+
 | category | question | what it tests |
 |---|---|---|
-| A | active users; June MAU | controls |
+| A | active users; active share (post-run addition); June MAU | controls |
 | B | June MAU on the pro plan | a dimension on the other table |
 | C | share of paying users active in June | a ratio no artifact defines |
 | D | June MAU by plan | a breakdown |
@@ -227,7 +242,8 @@ Answers are scored `correct`, `silent_wrong`, or `loud_error`. The report evalua
 - F3: the layer cannot compose an undefined ratio.
 
 ```
-uv run python eval/run_v2.py                     # full run: 3,240 episodes, $14.35 at list rates on 2026-10-29
+uv run python eval/run_v2.py                     # all defaults: 3,720 episodes (main run 2026-10-29, $14.35; spreadsheet addition 2026-10-30, $4.74)
+uv run python eval/run_v2.py --rescore --out results/v2   # re-score saved episodes with the current parsers, no API calls
 uv run python eval/run_v2.py --model openai/gpt-6-luna --lang en --runs 1   # smoke, about $0.02
 ```
 

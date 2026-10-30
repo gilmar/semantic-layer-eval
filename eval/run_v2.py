@@ -90,6 +90,14 @@ def decisions_for(question, arm, mode):
 
 # ------------------------------------------------------------------- jobs
 
+def classify(value, error_kind, gt, kind) -> str:
+    if error_kind == "api":
+        return "api_error"
+    if error_kind == "loud" or value is None:
+        return "loud_error"
+    return "correct" if matches(value, gt, kind) else "silent_wrong"
+
+
 def build_jobs(args):
     jobs = []
     for q in cfg.QUESTIONS:
@@ -154,14 +162,7 @@ def execute(job, fp_sets, meta, transcripts_dir) -> dict:
         state = v2_agent.run_episode(arm, text, kind, expected_keys, model, meta)
 
     value = normalize(state["value"], kind)
-    if state["error_kind"] == "api":
-        outcome = "api_error"
-    elif state["error_kind"] == "loud" or value is None:
-        outcome = "loud_error"
-    elif matches(value, gt, kind):
-        outcome = "correct"
-    else:
-        outcome = "silent_wrong"
+    outcome = classify(value, state["error_kind"], gt, kind)
 
     slug = re.sub(r"[^A-Za-z0-9.-]+", "_", f"{q['id']}_{job['lang']}_{mode}_{arm_name}_{model}_{job['run']}")
     transcript_path = transcripts_dir / f"{slug}.json"
@@ -175,7 +176,7 @@ def execute(job, fp_sets, meta, transcripts_dir) -> dict:
     return {
         "question": q["id"], "category": q["category"], "kind": kind,
         "lang": job["lang"], "mode": mode, "arm": arm_name, "model": model, "run": job["run"],
-        "value": json.dumps(value) if value is not None else "",
+        "value": json.dumps(value, sort_keys=True) if value is not None else "",
         "correct": outcome == "correct",
         "outcome": outcome,
         "interpretation": label_for(value, fp, kind) if value is not None else "error",
@@ -402,6 +403,80 @@ def write_report(records, fp_sets, meta, out_dir, args):
     (out_dir / "report.md").write_text("\n".join(lines) + "\n")
 
 
+# ----------------------------------------------------------------- rescore
+
+def _final_answer(transcript: dict, mode: str):
+    """The reply a single-shot episode was resolved from, or the value of
+    an agentic episode's answer call (None if it never answered)."""
+    assistant = [m for m in transcript["messages"] if m["role"] == "assistant"]
+    if mode == "single_shot":
+        return assistant[-1].get("content") or "" if assistant else None
+    for message in reversed(assistant):
+        for call in message.get("tool_calls") or []:
+            if call.get("function", {}).get("name") == "answer":
+                args = call["function"].get("arguments") or "{}"
+                args = json.loads(args) if isinstance(args, str) else args
+                return args.get("value") if isinstance(args, dict) else None
+    return None
+
+
+def rescore(out_dir, fp_sets, meta, args):
+    """Re-resolve saved episodes with the current resolvers: no API calls,
+    same replies. The first rescore keeps the as-run scores in
+    results.as_run.csv, so corrections stay auditable."""
+    as_run = out_dir / "results.as_run.csv"
+    if not as_run.exists():
+        as_run.write_text((out_dir / "results.csv").read_text())
+    questions = {q["id"]: q for q in cfg.QUESTIONS}
+    records, changed = [], 0
+    for row in csv.DictReader(open(as_run)):
+        q = questions[row["question"]]
+        kind, fp = q["kind"], fp_sets[q["fp"]]
+        gt = fp[cfg.GROUND_TRUTH_KEYS[q["fp"]]]
+        expected_keys = list(gt.keys()) if isinstance(gt, dict) else None
+        rec = dict(row)
+        for k in ("run", "tool_calls", "input_tokens", "output_tokens"):
+            rec[k] = int(rec[k])
+        rec["cost_usd"] = float(rec["cost_usd"])
+        rec["decisions"] = int(rec["decisions"]) if rec["decisions"] else None
+        value, error, error_kind = None, row["error"], ""
+        if row["outcome"] == "api_error":
+            error_kind = "api"
+        else:
+            raw = _final_answer(json.loads((ROOT / row["transcript"]).read_text()), row["mode"])
+            try:
+                if raw is None:
+                    raise LoudError(row["error"] or "No answer")
+                if row["mode"] == "single_shot":
+                    value = v2_arms.resolve_single_shot(
+                        v2_arms.ARMS[row["arm"]], raw, kind, expected_keys,
+                        meta, cfg.CUBE_URL, cfg.CUBE_TOKEN)
+                else:
+                    value = v2_arms.resolve_answer(raw, kind, expected_keys)
+                error = ""
+            except LoudError as exc:
+                error, error_kind = str(exc)[:300], "loud"
+        value = normalize(value, kind)
+        outcome = classify(value, error_kind, gt, kind)
+        before = json.loads(row["value"]) if row["value"] else None
+        changed += outcome != row["outcome"] or value != before
+        rec.update(value=json.dumps(value, sort_keys=True) if value is not None else "",
+                   correct=outcome == "correct", outcome=outcome, error=error,
+                   interpretation=label_for(value, fp, kind) if value is not None else "error",
+                   _value=value)
+        records.append(rec)
+    with open(out_dir / "results.csv", "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=[k for k in records[0] if not k.startswith("_")],
+                                extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(records)
+    args.runs = max(r["run"] for r in records)
+    write_report(records, fp_sets, meta, out_dir, args)
+    print(f"Rescored {len(records)} episodes in {out_dir}: {changed} changed. "
+          f"As-run scores kept in {as_run.name}.")
+
+
+
 # ------------------------------------------------------------------- main
 
 def parse_args():
@@ -413,6 +488,9 @@ def parse_args():
     p.add_argument("--lang", action="append", choices=cfg.LANGUAGES)
     p.add_argument("--runs", type=int, help=f"runs per cell (default {cfg.N_RUNS})")
     p.add_argument("--out", default=cfg.RESULTS_DIR, help="output directory")
+    p.add_argument("--rescore", action="store_true",
+                   help="re-resolve the episodes saved in --out with the current resolvers; "
+                        "no API calls")
     return p.parse_args()
 
 
@@ -432,6 +510,12 @@ def main():
         sys.exit("Fingerprint parity check failed (harness SQL vs generator):\n  "
                  + "\n  ".join(errors) + "\nRegenerate data or fix the mismatch.")
     print("Fingerprint parity: harness SQL matches the generator on every block.")
+
+    if args.rescore:
+        out_dir = ROOT / args.out
+        meta = v2_arms.fetch_cube_meta(cfg.CUBE_URL, cfg.CUBE_TOKEN)
+        rescore(out_dir, fp_sets, meta, args)
+        return
 
     jobs = build_jobs(args)
     if not jobs:

@@ -392,7 +392,7 @@ def resolve_single_shot(arm: Arm, reply: str, kind: str, expected_keys,
                         meta: dict | None, cube_url: str, token: str):
     if arm.engine == "csv":
         try:
-            return to_number(v1._first_number(reply))
+            return to_number(v1._final_number(reply))
         except ValueError as exc:
             raise LoudError(str(exc)) from None
     if arm.engine == "sql":

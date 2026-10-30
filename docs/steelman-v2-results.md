@@ -256,3 +256,68 @@ Claims the data supports:
 
    These are where the layer's remaining structural claims (versioned definitions, propagation, enforcement) would be tested rather than assumed.
 3. Revise the README thesis to match the evidence before presenting it.
+
+## Post-run addition: spreadsheet in context (2026-10-30)
+
+Many people answer data questions by pasting a spreadsheet into a model's context, so the addition compares that workflow with the other arms. It was designed and pre-registered after the results above (spec section "Post-run addition", commit `fca7945`), then run on the two questions `users.csv` alone can answer:
+- A1, active users (157);
+- A3, active share (57.93%; v1's Q2).
+
+The two arms:
+- `csv_raw`: the spreadsheet only.
+- `csv_documented`: the spreadsheet plus the users column notes and the full metrics dictionary.
+
+A3 also ran on the four core arms. Volume: 480 single-shot calls, $4.74 at list rates. Outputs: `results/v2_csv_a3/` and `results/v2_csv_a1/`; A1's core-arm numbers come from the main run.
+
+### Result
+
+A spreadsheet in context is the weakest way to ask. Documentation helps, but it does not fix the counting.
+
+| question | raw_sql | documented_prose | documented_views | semantic_layer | csv_raw | csv_documented |
+|---|---|---|---|---|---|---|
+| A1 active users | 77% | 100% | 100% | 100% | 43% | 50% |
+| A3 active share | 62% | 100% | 100% | 100% | 7% | 47% |
+
+By model (A1 / A3):
+
+| model | csv_raw | csv_documented |
+|---|---|---|
+| Claude Sonnet 4.6 | 30% / 10% | 0% / 20% |
+| GPT-6.1 Sol | 100% / 0% | 100% / 100% |
+| Claude Haiku 4.5 | 20% / 0% | 0% / 0% |
+| GPT-6.1 Terra | 60% / 30% | 100% / 100% |
+| GPT-6 Luna | 50% / 0% | 60% / 60% |
+| gpt-oss-20b | 0% / 0% | 40% / 0% |
+
+- **Two failure modes, separated.**
+  - `csv_raw` fails on definitions first. On A3, 26 of 60 answers were 58.00%: status `active` divided by all 300 rows, ignoring the exclusions the data itself shows. The same reading appears in `raw_sql`.
+  - With the definitions supplied, the misreadings disappear and what is left is miscounting: answers off by 1 to 32 users on A1. Sonnet came in 3 to 27 below 157 on every A1 run. Haiku ranged from 3 below to 32 above; one run returned 2, a row id.
+- **Only the models that reason before answering count reliably.** GPT-6.1 Sol and Terra were perfect with documentation, on both questions and both languages. Claude, which runs without extended thinking, counted in visible text and was wrong 38 of 40 times with documentation. The small models land between.
+- **Silent.** 89 of 90 `csv_raw` failures and 56 of 62 `csv_documented` failures are confident wrong numbers. The rest are empty replies from `gpt-oss-20b`.
+- **Cost.** A spreadsheet call ships about 12,000 input tokens, against about 1,100 for the semantic layer. Per correct answer, `csv_documented` costs $0.038 and `csv_raw` $0.069, against $0.0014 for the semantic layer and $0.0019-0.0022 for documented SQL: 27x and 49x the layer.
+- **Language.** `csv_raw` scored 30% in English and 20% in Portuguese; `csv_documented` 52% and 45%. That is a small gap, unlike the zero gap on every other arm, but at 60 episodes per language it is not distinguishable from noise.
+
+### Parser corrections, made after the run
+
+Two bugs in reading spreadsheet replies were found after the run and fixed. Every episode was re-scored from its saved reply with no new API calls (`eval/run_v2.py --rescore`). The as-run scores are kept in each folder's `results.as_run.csv`.
+- **Decimal commas.** Portuguese answers like "57,93%" were read as 5793.
+- **Verbose replies.** Claude ignored "reply with a single number" in 27 replies and counted aloud. The parser took the first number, a row id, instead of the final answer.
+
+The parser now takes the last number and reads a lone comma followed by one or two digits as a decimal comma. That changed 13 outcomes, every one from wrong to correct and every one on a spreadsheet arm: 10 decimal-comma answers from Sol and Terra, 3 final answers from Sonnet. A3 `csv_documented` rose from 27% to 47% and A3 `csv_raw` from 5% to 7%. 36 more episodes kept their outcome but now show the reading the model actually gave. Re-scoring the main run with the same code changed nothing (0 of 3,240), so the correction touches only the spreadsheet arms.
+
+### Pre-registered expectations, scored
+
+| expectation (written before the run) | result |
+|---|---|
+| `csv_raw` at or below `raw_sql` on both questions | **held**: 43% vs 77%, 7% vs 62% |
+| `csv_documented` gets definitions right but loses to counting; Sol and Terra high; Claude and the small models low; clearly below `documented_prose` | **held**: Sol and Terra 100%, Claude 0-20%, Luna 60%, gpt-oss 0-40%; 47-50% vs 100% |
+| A3 harder than A1 for both CSV arms | **held for `csv_raw`** (43% to 7%); **barely for `csv_documented`** (50% to 47%) |
+| Semantic layer about 100% on both, at about a tenth of a CSV call's input | **held**: 100%, 1,120 vs about 12,000 input tokens |
+| No language effect | **mixed**: a 7-10 point gap, within noise at this sample size |
+
+### What it adds to the picture
+
+The main run found that a documented warehouse matches the semantic layer when the model writes SQL. This addition shows the gap that the "paste the spreadsheet" workflow leaves open:
+- The same documentation that made SQL arms perfect brings a spreadsheet in context only to about 50%. The model has to do the arithmetic itself, and most models cannot count 300 rows reliably in one pass.
+- Any interface where an engine executes the definition closes that gap: documented SQL and the semantic layer alike.
+- Against the spreadsheet workflow, the semantic layer is a clear improvement on accuracy (100% vs 47-50%) and on cost per correct answer (27-49x). Against a documented warehouse queried with SQL, the main run's conclusion stands.

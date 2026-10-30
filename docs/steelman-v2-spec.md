@@ -308,3 +308,5 @@ Added after the 2026-10-29 results, written and committed before this addition r
 - A3 is harder than A1 for both CSV arms: two counts and a division instead of one count.
 - The semantic layer scores about 100% on both questions, at roughly a tenth of a CSV call's input.
 - No language effect, as in the main run.
+
+Result (2026-10-30): run and scored in `docs/steelman-v2-results.md`, section "Post-run addition". Two parser bugs found after the run were fixed and every episode re-scored from its saved reply: decimal commas, and numbers taken from visible working instead of the final answer. The as-run scores are kept alongside. The expectations above are unchanged.

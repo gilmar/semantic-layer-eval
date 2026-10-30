@@ -74,11 +74,23 @@ PROFILING_NOTES = """Profiling notes (obtained by running SELECT DISTINCT and mi
   events.occurred_at ranges from 2023 to 2026-07-01 and includes time of day"""
 
 
-def _first_number(text: str) -> float:
-    m = re.search(r"-?\d[\d,]*\.?\d*", text.replace("**", ""))
-    if not m:
+_NUMBER = re.compile(r"-?\d+(?:[.,]\d+)*")
+
+
+def _final_number(text: str) -> float:
+    """The answer a spreadsheet reply ends on. Models told to reply with a
+    single number sometimes work the count out in visible text first
+    (Claude, which runs without hidden reasoning); the first number in
+    such a reply is a row id, the last one is the answer. A lone comma
+    followed by one or two digits is a decimal comma ("57,93" in
+    Portuguese); any other comma separates thousands."""
+    tokens = _NUMBER.findall(text.replace("**", ""))
+    if not tokens:
         raise ValueError(f"No number found in response: {text[:200]!r}")
-    return float(m.group().replace(",", ""))
+    token = tokens[-1]
+    if re.fullmatch(r"-?\d+,\d{1,2}", token):
+        return float(token.replace(",", "."))
+    return float(token.replace(",", ""))
 
 
 def _strip_fences(text: str) -> str:
@@ -237,7 +249,7 @@ Reply with a single number and nothing else."""
 
 
 def resolve_csv(model_output: str) -> float:
-    return _first_number(model_output)
+    return _final_number(model_output)
 
 
 # ---------------------------------------------------------- semantic_layer
