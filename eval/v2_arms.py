@@ -53,9 +53,30 @@ class LoudError(Exception):
 @dataclass(frozen=True)
 class Arm:
     name: str
-    engine: str                       # "sql" or "cube"
+    engine: str                       # "sql", "cube", or "csv"
     connect: Callable | None          # DuckDB environment for SQL arms
-    render: Callable[[], str] | None  # catalog context for SQL arms
+    render: Callable[[], str] | None  # catalog context (SQL) or documentation (csv)
+
+
+def csv_documentation() -> str:
+    """What a careful analyst pastes next to the spreadsheet: the users
+    table and column notes and the full metrics dictionary, rendered from
+    the same catalog the documented arms read (no views, no source
+    objects, since the spreadsheet is all the model has)."""
+    con = v1._connect_modeled(views=False)
+    try:
+        table_comment = con.execute(
+            "SELECT comment FROM duckdb_tables() WHERE table_name = 'users'").fetchone()[0]
+        columns = v1._render_columns(con, "users", with_comments=True)
+        rows = con.execute(
+            "SELECT metric_name, owner, definition FROM metrics_dictionary "
+            "ORDER BY metric_name").fetchall()
+    finally:
+        con.close()
+    dictionary = "\n".join(f"  {name} (owner: {owner})\n    definition: {definition}"
+                           for name, owner, definition in rows)
+    return (f"Column notes for users.csv:\n  {table_comment}\n{columns}\n\n"
+            f"Official metric definitions (full metrics dictionary):\n{dictionary}")
 
 
 ARMS = {
@@ -67,6 +88,8 @@ ARMS = {
     "documented_views": Arm(
         "documented_views", "sql", v1._connect_modeled, v1.render_modeled_docs),
     "semantic_layer": Arm("semantic_layer", "cube", None, None),
+    "csv_raw": Arm("csv_raw", "csv", None, None),
+    "csv_documented": Arm("csv_documented", "csv", None, csv_documentation),
 }
 
 _context_cache: dict = {}
@@ -178,7 +201,38 @@ def cube_load(query: dict, cube_url: str, token: str) -> list:
 
 # ------------------------------------------------------------- prompts
 
+CSV_REPLY = ("Reply with a single number and nothing else. "
+             "Give percentages with two decimal places.")
+
+
+def csv_prompt(arm: Arm, question: str) -> str:
+    """csv_raw is v1's spreadsheet prompt plus a precision instruction
+    (shares are scored within 0.02pp, so a correctly rounded "57.9" would
+    otherwise score as wrong); csv_documented adds the documentation a
+    careful analyst would paste alongside the spreadsheet."""
+    data = v1.CSV_PATH.read_text()
+    if arm.render is None:
+        return f"""Below is the full contents of users.csv, our user spreadsheet.
+
+{data}
+
+Question: {question}
+
+{CSV_REPLY}"""
+    return f"""Below is the full contents of users.csv, our user spreadsheet, followed by the column notes and official metric definitions from our data team.
+
+{data}
+
+{arm.render()}
+
+Question: {question}
+
+{CSV_REPLY}"""
+
+
 def single_shot_prompt(arm: Arm, question: str, meta: dict | None) -> str:
+    if arm.engine == "csv":
+        return csv_prompt(arm, question)
     if arm.engine == "sql":
         return f"""You are a data analyst with direct SQL access to the production database (DuckDB dialect).
 
@@ -336,6 +390,11 @@ def parse_cube_query(raw) -> dict:
 
 def resolve_single_shot(arm: Arm, reply: str, kind: str, expected_keys,
                         meta: dict | None, cube_url: str, token: str):
+    if arm.engine == "csv":
+        try:
+            return to_number(v1._first_number(reply))
+        except ValueError as exc:
+            raise LoudError(str(exc)) from None
     if arm.engine == "sql":
         con = arm.connect()
         try:

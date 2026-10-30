@@ -163,6 +163,7 @@ def compute_all() -> dict:
     try:
         return {
             "active_count": count_fp,
+            "active_share": arms.compute_share_fingerprints(count_fp),
             "mau_june_2026": mau_fp,
             "wau_week_of_2026_06_22": wau_fp,
             "b1_pro_mau_june_2026": b1(con, mau_fp),

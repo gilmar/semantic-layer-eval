@@ -98,7 +98,8 @@ def build_jobs(args):
         for mode in cfg.MODES:
             if args.mode and mode not in args.mode:
                 continue
-            arm_names = cfg.ALL_ARMS if mode == "single_shot" else q["agentic_arms"]
+            arm_names = (q.get("single_shot_arms", cfg.CORE_ARMS) if mode == "single_shot"
+                         else q["agentic_arms"])
             for lang in cfg.LANGUAGES:
                 if args.lang and lang not in args.lang:
                     continue
@@ -304,7 +305,7 @@ def write_report(records, fp_sets, meta, out_dir, args):
               "|---|---|---|---|---|---|---|---|---|"]
     for cat in CATEGORY_TITLES:
         for mode in modes:
-            for arm in cfg.ALL_ARMS:
+            for arm in cfg.ARM_ORDER:
                 group = select(records, arm=arm, mode=mode, categories={cat})
                 if not group:
                     continue
@@ -324,7 +325,7 @@ def write_report(records, fp_sets, meta, out_dir, args):
               "|---|---|---|---|---|"]
     for mode in modes:
         ranked = []
-        for arm in cfg.ALL_ARMS:
+        for arm in cfg.ARM_ORDER:
             group = select(records, arm=arm, mode=mode)
             if group:
                 ranked.append((mean_distinct(group), arm, accuracy(group)))
@@ -340,7 +341,7 @@ def write_report(records, fp_sets, meta, out_dir, args):
               "| tool calls / episode | total | $ / correct | wasted |",
               "|---|---|---|---|---|---|---|---|---|"]
     for mode in modes:
-        for arm in cfg.ALL_ARMS:
+        for arm in cfg.ARM_ORDER:
             group = select(records, arm=arm, mode=mode)
             if not group:
                 continue
@@ -366,7 +367,7 @@ def write_report(records, fp_sets, meta, out_dir, args):
                   "|---|---|---|---|---|---|---|---|---|---|"]
         for mode in modes:
             for lang in cfg.LANGUAGES:
-                for arm in cfg.ALL_ARMS:
+                for arm in cfg.ARM_ORDER:
                     for model in cfg.MODELS:
                         cell = [r for r in group_q if r["mode"] == mode and r["lang"] == lang
                                 and r["arm"] == arm and r["model"] == model]
@@ -407,7 +408,7 @@ def parse_args():
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--question", action="append", help="question id (repeatable)")
     p.add_argument("--mode", action="append", choices=cfg.MODES)
-    p.add_argument("--arm", action="append", choices=cfg.ALL_ARMS)
+    p.add_argument("--arm", action="append", choices=cfg.ARM_ORDER)
     p.add_argument("--model", action="append")
     p.add_argument("--lang", action="append", choices=cfg.LANGUAGES)
     p.add_argument("--runs", type=int, help=f"runs per cell (default {cfg.N_RUNS})")
@@ -462,7 +463,7 @@ def main():
 
     order = {q["id"]: i for i, q in enumerate(cfg.QUESTIONS)}
     records.sort(key=lambda r: (order[r["question"]], cfg.MODES.index(r["mode"]), r["lang"],
-                                cfg.ALL_ARMS.index(r["arm"]), cfg.MODELS.index(r["model"]), r["run"]))
+                                cfg.ARM_ORDER.index(r["arm"]), cfg.MODELS.index(r["model"]), r["run"]))
     with open(out_dir / "results.csv", "w", newline="") as f:
         fields = [k for k in records[0] if not k.startswith("_")]
         writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")

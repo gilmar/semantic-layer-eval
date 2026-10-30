@@ -279,3 +279,32 @@ The spec's listed F1 separators (2 qualifying + 1 passive, exactly 3, 3 across M
 **Falsifier thresholds** (fixed in `eval/v2_config.py` before any full run): "matches" means accuracy within 5pp of the layer's or above AND mean distinct answers within 0.25 of the layer's or below; "recovers" means agentic accuracy on C at or above 80%. F1 is evaluated on agentic B-E, F2 on single-shot B-E with an agentic check on B, F3 on semantic C in both modes.
 
 **Prompt footprint.** Listing dimensions grew the semantic prompt: about 1,070 input tokens single-shot vs about 1,520 for `documented_views`, a 0.7x ratio rather than v1's 0.5x.
+
+## Post-run addition: spreadsheet in context (2026-10-30)
+
+Added after the 2026-10-29 results, written and committed before this addition ran. It does not revise the thesis, falsifiers, or expectations above, and it is not part of F1-F3.
+
+**Why.** Many people answer data questions by pasting a spreadsheet into a model's context. v1 tested that only on one question, with no documentation. That setup conflates two failures: not knowing the definition, and miscounting rows.
+
+**Design.**
+- Two single-shot arms, given only `users.csv`:
+  - `csv_raw`: v1's spreadsheet prompt.
+  - `csv_documented`: the same, plus the users table and column notes and the full metrics dictionary, rendered from the catalog the documented arms read.
+- Both prompts ask for percentages with two decimal places, since shares are scored within 0.02pp and a correctly rounded "57.9" would otherwise count as wrong.
+- They run on the two questions `users.csv` alone can answer:
+  - A1 (active users, 157);
+  - A3 (active share, 57.93%; v1's Q2, new to v2).
+- A3 also runs on the four core arms, single-shot only. Its decision counts are raw 5, prose 5, views 3, semantic 1, both CSV arms 5.
+- Questions needing `events.csv` (about 125-140k tokens) were left out on cost.
+
+**Volume and cost.** 360 calls on A3 (six arms) plus 120 on A1 (two CSV arms): 480 calls. About $4.50 at list rates, dominated by the CSV prompts (about 11-13k input tokens each).
+
+**Expectations, written before the run:**
+- `csv_raw` fails on definitions the way `raw_sql` does (A1 single-shot: 77%). Counting errors on weaker models stack on top, so it scores at or below `raw_sql` on both questions.
+- `csv_documented` gets the definitions right but loses accuracy to counting:
+  - The models that reason before answering (GPT-6.1 Sol and Terra) score high.
+  - Claude without extended thinking and the two small models score low.
+  - Overall it lands clearly below `documented_prose`, which runs the count in a database.
+- A3 is harder than A1 for both CSV arms: two counts and a division instead of one count.
+- The semantic layer scores about 100% on both questions, at roughly a tenth of a CSV call's input.
+- No language effect, as in the main run.

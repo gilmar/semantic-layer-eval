@@ -4,13 +4,15 @@ Models, pricing, provider routing, sampling, and the Cube endpoint are
 shared with v1 (eval/config.py) so both versions price and route every
 model identically. Everything specific to v2 lives here.
 
-Full-run volume with the defaults below (about $23 at list rates; see the
-spec's "Volume and cost"):
-  single-shot: 8 questions x 4 arms x 6 models x 2 languages x 5 runs = 1,920 calls
+Full-run volume with the defaults below. The 2026-10-29 run covered the
+original 3,240 episodes ($14.35 at list rates); the spreadsheet addition
+(A3 on every single-shot arm, the two CSV arms on A1) adds 480 calls:
+  single-shot: 8 questions x 4 arms + 2 questions x 2 CSV arms + A3 x 4 arms
+               = 40 arm cells x 6 models x 2 languages x 5 runs = 2,400 calls
   agentic:     (8 x 2 + 3 x 2) arm cells x 6 models x 2 languages x 5 runs = 1,320 episodes
 
 The spec's cheaper first pass (Sonnet, Haiku, Luna, gpt-oss-20b at three
-runs, about $7.50) is the same run filtered with --model and --runs 3.
+runs) is the same run filtered with --model and --runs 3.
 """
 
 import config as v1
@@ -49,7 +51,13 @@ CUBE_TOKEN = v1.CUBE_TOKEN
 RESULTS_DIR = "results/v2"
 
 SQL_ARMS = ["raw_sql", "documented_prose", "documented_views"]
-ALL_ARMS = SQL_ARMS + ["semantic_layer"]
+CORE_ARMS = SQL_ARMS + ["semantic_layer"]
+# Spreadsheet-in-context arms (post-run addition, see the spec): the whole
+# users.csv in the prompt, with no documentation or with the users column
+# notes and full metrics dictionary. Single-shot only, and only on
+# questions users.csv alone can answer.
+CSV_ARMS = ["csv_raw", "csv_documented"]
+ARM_ORDER = CORE_ARMS + CSV_ARMS
 # Agentic coverage per the spec: views and the layer everywhere, the two
 # weaker arms on categories A and B only, to bound cost.
 AGENTIC_ALL = ["documented_views", "semantic_layer"]
@@ -71,9 +79,24 @@ QUESTIONS = [
             "en": "How many active users do we have?",
             "pt": "Quantos usuários ativos nós temos?",
         },
-        "agentic_arms": ALL_ARMS,
+        "single_shot_arms": ARM_ORDER,
+        "agentic_arms": CORE_ARMS,
         "decisions": {"raw_sql": 3, "documented_prose": 3, "documented_views": 1,
-                      "semantic_layer": 1},
+                      "semantic_layer": 1, "csv_raw": 3, "csv_documented": 3},
+    },
+    {
+        # Post-run addition (v1's Q2), for the spreadsheet comparison: the
+        # ratio both sides define (dictionary row active_share, Cube measure
+        # users.active_share). Single-shot only.
+        "id": "A3_active_share", "category": "A", "fp": "active_share", "kind": "percent",
+        "text": {
+            "en": "What share of our users is active?",
+            "pt": "Qual é o percentual de usuários ativos?",
+        },
+        "single_shot_arms": ARM_ORDER,
+        "agentic_arms": [],
+        "decisions": {"raw_sql": 5, "documented_prose": 5, "documented_views": 3,
+                      "semantic_layer": 1, "csv_raw": 5, "csv_documented": 5},
     },
     {
         "id": "A2_mau_june", "category": "A", "fp": "mau_june_2026", "kind": "count",
@@ -81,7 +104,7 @@ QUESTIONS = [
             "en": "How many monthly active users did we have in June 2026?",
             "pt": "Quantos usuários ativos mensais tivemos em junho de 2026?",
         },
-        "agentic_arms": ALL_ARMS,
+        "agentic_arms": CORE_ARMS,
         "decisions": {"raw_sql": 6, "documented_prose": 6, "documented_views": 2,
                       "semantic_layer": 2},
     },
@@ -91,7 +114,7 @@ QUESTIONS = [
             "en": "How many monthly active users on the pro plan did we have in June 2026?",
             "pt": "Quantos usuários ativos mensais do plano pro tivemos em junho de 2026?",
         },
-        "agentic_arms": ALL_ARMS,
+        "agentic_arms": CORE_ARMS,
         "decisions": {"raw_sql": 7, "documented_prose": 7, "documented_views": 4,
                       "semantic_layer": 3},
     },
@@ -154,6 +177,7 @@ QUESTIONS = [
 # Ground-truth key per fingerprint block.
 GROUND_TRUTH_KEYS = {
     "active_count": "governed_active_users",
+    "active_share": "governed_active / valid_universe",
     "mau_june_2026": "governed_mau",
     "wau_week_of_2026_06_22": "governed_wau",
     "b1_pro_mau_june_2026": "governed_pro_mau",
