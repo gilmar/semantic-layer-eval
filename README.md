@@ -4,6 +4,34 @@ A runnable argument for one thesis: traditional database tables, even well model
 
 The experiment does not compare a semantic layer against a strawman. It compares it against two versions of the same warehouse. One is undocumented, the way most databases actually are. The other is the steelman: catalog comments on every column, a metrics dictionary that fully defines every official metric in prose, and curated views encoding the governed logic. Nothing is hidden and retrieval is perfect. If documentation could substitute for a semantic layer, the steelman is where it would happen.
 
+## Results
+
+The thesis above was written before any run. So were the predictions in "How to read the expected result" and the pre-registered falsifiers in `docs/steelman-v2-spec.md`. All three are kept as written. I expected a clear gap in favour of the semantic layer, especially on composed questions and on weaker models. The full steelman v2 run did not show one: 3,240 episodes, six models, English and Portuguese, $14.35 at list rates, on 2026-10-29.
+
+| arm | single-shot accuracy | agentic accuracy |
+|---|---|---|
+| undocumented tables (`raw_sql`) | 11% | 22% |
+| comments and dictionary, no views (`documented_prose`) | 92% | 99% |
+| comments, dictionary, and views (`documented_views`) | 94% | 97% |
+| semantic layer (Cube) | 83% | 97% |
+
+The semantic layer's single-shot figure includes a question it cannot answer in one query by design (0%) and 12 correct answers the harness wrongly rejected. Correcting both puts it a few points ahead of the prose-only arm, still inside the pre-registered margin. Two of the three falsifiers triggered: documented views matched the layer, and so did prose alone. The third did not: agents composed the undefined ratio through the layer in two queries.
+
+What the data supports:
+- Documentation is what matters for accuracy. Undocumented tables fail 78-89% of the time, and almost always silently.
+- The semantic layer was the cheapest arm per correct answer: 19% below documented views single-shot, 39% agentically. It also removed a failure class the documented arms had: SQL written in the wrong dialect.
+
+What the data does not support:
+- The thesis that documentation cannot substitute for a semantic layer. On this benchmark it did.
+- Several mechanism claims written before the run. Each is marked with a post-run note below rather than rewritten.
+
+Where this leaves my position: on a small catalog the model can see in full, a well-documented warehouse substitutes for a semantic layer on accuracy and consistency. The layer's measured advantages are cost and robustness to SQL-writing mistakes. The other arguments for a layer were not tested here, and they remain open questions, not conclusions:
+- definition changes propagating to every consumer;
+- enforcement and access control;
+- catalogs too large to send whole.
+
+Caveats: one synthetic benchmark; the same author wrote the questions and the artifacts. The v1 eval (`eval/run_eval.py`) has not been run in full; its Q1, Q3, and Q4 are included in v2 as A1, A2, and E2. Full analysis: `docs/steelman-v2-results.md`.
+
 ## The two versions
 
 `db/schema.py` is the single source of truth. Both the Cube-facing database and the harness environments are built from it, so the documentation a model sees is provably the documentation stored in the catalog.
@@ -90,13 +118,19 @@ For the share question, the twelve plausible numerator/denominator combinations 
 
 **Q2: "What share of our users is active?"** runs on the two SQL arms and the semantic layer. This is where the documented steelman meets its structural limit. The curated view hands the model the numerator. The denominator policy exists only as prose in the dictionary and must be reconstructed into SQL on every single query. Composition is exactly what documentation cannot execute. On the Cube side, `active_share` ships as one governed measure.
 
+> **Post-run note (steelman v2, 2026-10-29):** composition did not defeat documentation. On v2's composed questions (pro-plan MAU, MAU by plan, share of paying users active) the documented arms scored 83-100% single-shot and 95-100% agentic.
+
 **Q3: "How many monthly active users did we have in June 2026?"** runs on the two SQL arms and the semantic layer. The join question. Even with `vw_qualifying_events` handing the documented arm a clean fact view, the model still chooses DISTINCT or fan-out, still writes the date range, and still risks the BETWEEN boundary bug, because docs describe and views pre-filter but neither executes the metric. On the Cube side, `monthly_active_users` is a `count_distinct` measure over the curated view, and Cube date ranges are end-inclusive whole days, so the boundary bug cannot happen there by construction. There is no CSV arm: 7,691 event rows do not fit the spreadsheet path, which is itself part of the argument.
+
+> **Post-run note (steelman v2, 2026-10-29):** the date-range guarantee holds, but date ranges are not the only way to filter time in Cube. Claude Haiku 4.5 filtered `occurred_at` with `gte`/`lte` operators and reproduced the BETWEEN bug inside the layer (5 of 60 single-shot answers on the MAU-by-plan question).
 
 **Q4: "How many weekly active users did we have in the week of June 22, 2026?"** runs on the two SQL arms and the semantic layer. The second time grain. Every Q3 trap comes back at the new grain, and the week adds choices a month does not have: which day starts the week, where Sunday ends, and whether a week number needs a year. The documented arm gets the ISO-week policy in the dictionary, but it still has to turn that prose into date arithmetic on every query. On the Cube side, `weekly_active_users` is one more `count_distinct` measure on the same cube; the model names Monday to Sunday and Cube does the rest.
 
 Each (question, language, arm, model) cell runs five times at temperature 1.0. Two metrics: correctness against the governed value, and consistency (distinct answers per cell).
 
 Six models from two vendors, spanning a capability gradient: Claude Haiku 4.5 and Sonnet 4.6, GPT-6.1 Terra and Sol, and two less capable models below them, GPT-6 Luna (OpenAI's small tier) and gpt-oss-20b (a 21B open-weight model, the floor). Anthropic offers nothing below Haiku 4.5 on OpenRouter; Haiku 5.5 is cheaper but stronger. The gradient tests whether the semantic layer's advantage widens as model capability drops: a smaller decision surface should matter most to the models least able to reconstruct definitions on their own.
+
+> **Post-run note (steelman v2, 2026-10-29):** the advantage did not widen. The weakest model, gpt-oss-20b, scored about 80% on every guided arm, semantic layer included. The layer's clearest single-shot lead came from Claude Sonnet 4.6 writing a PostgreSQL function that DuckDB lacks, not from definitions.
 
 Each model runs at its vendor default, and the defaults differ. The GPT-6 and GPT-6.1 models do not accept a temperature parameter, so they sample at OpenAI's default. The OpenAI models also reason before answering: little on the SQL and semantic arms, and 500 to 2,500 hidden tokens on the CSV arm depending on the model. Claude runs without extended thinking. Keep both in mind when comparing consistency and CSV accuracy across vendors. Reasoning tokens are billed as output, so the token and cost tables include them.
 
@@ -105,6 +139,8 @@ gpt-oss-20b is served by many OpenRouter hosts at different precisions, and unpi
 ## Portuguese variants
 
 Every question also runs in Portuguese (`LANGUAGES` in `eval/config.py`). The scaffolding stays in English, as warehouses in Brazilian companies usually do: schema, comments, dictionary, and Cube descriptions are English; only the business question changes. The semantic arm reduces to measure selection plus deterministic execution, so it is structurally language-invariant. The SQL arms must bridge translation, definition reconstruction, and SQL synthesis on every query, so the pt rows measure how much interpretation variance the language boundary adds on top of the definitional ambiguity.
+
+> **Post-run note (steelman v2, 2026-10-29):** no arm showed a language effect. Portuguese and English accuracy were within 2 points on every arm and mode, so invariance held for the SQL arms as well as the layer.
 
 ## The semantic arm protocol
 
@@ -159,6 +195,14 @@ Scope this honestly when presenting. The numbers are marginal inference cost per
 
 The documented arm will likely score well on Q1, and that is the honest outcome. It is also the point. Documentation describes; it still leaves definition-to-SQL reconstruction with the model on every query, which is why Q2, Q3, Q4, the pt rows, and the consistency columns matter. Even against perfect docs and curated views, the structural differences remain: a semantic layer executes the definition from a versioned artifact instead of re-deriving it, composes governed metrics (the ratio, the MAU, and the WAU are each one measure, not a per-query reconstruction), makes whole bug classes unrepresentable (fan-out, date boundaries), stays invariant to the language of the question, propagates a definition change to every consumer at once, and can deny raw access outright. Docs are advice. The layer is enforcement outside the model.
 
+> **Post-run note (steelman v2, 2026-10-29):** this paragraph is the pre-run expectation, kept as written. Measured against the run:
+> - The documented arms did not slip on composed questions.
+> - Date-boundary bugs were not unrepresentable in the layer (see the Q3 note).
+> - Language invariance held for every arm, not only the layer.
+> - Definition propagation and access denial were not tested.
+>
+> See Results above.
+
 ## Steelman v2
 
 v1's documented arm passed every smoke call because its curated views were written knowing the questions: each one is a `COUNT(DISTINCT)` over a view that already encodes the definition. v2 (spec: `docs/steelman-v2-spec.md`) holds the authored artifacts fixed and asks compositions of them:
@@ -183,7 +227,7 @@ Answers are scored `correct`, `silent_wrong`, or `loud_error`. The report evalua
 - F3: the layer cannot compose an undefined ratio.
 
 ```
-uv run python eval/run_v2.py                     # full run: 3,240 episodes, about $23
+uv run python eval/run_v2.py                     # full run: 3,240 episodes, $14.35 at list rates on 2026-10-29
 uv run python eval/run_v2.py --model openai/gpt-6-luna --lang en --runs 1   # smoke, about $0.02
 ```
 
@@ -193,6 +237,15 @@ Outputs go to `results/v2/`: `results.csv`, `report.md`, and one transcript per 
 
 Two tables, four questions, one join, two time grains. Real ambiguity compounds further: multi-hop joins, timezones, currency, fiscal calendars, revenue recognition. Each adds another silent choice per query. The demo isolates the mechanism; production multiplies it.
 
+It is also a best case for documentation. The whole catalog (two tables, seven dictionary rows) fits in every prompt, so finding the right documentation is never the bottleneck. Read the v2 result as that ceiling.
+
 ## Extensions
 
 Add Gemini OpenRouter slugs to `MODELS` in `eval/config.py` (and matching `PRICING` entries) for a third vendor.
+
+The v2 results point at tests this toy cannot run:
+- a catalog too large to send whole;
+- a metric definition changed in one artifact but not the other;
+- multi-hop joins.
+
+Two known harness issues can be fixed and re-scored from the saved transcripts without new API calls: a breakdown check that was too strict, and a missing fingerprint on the paying-share question.

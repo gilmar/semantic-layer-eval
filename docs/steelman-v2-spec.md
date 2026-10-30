@@ -1,6 +1,6 @@
 # Steelman v2: composition under frozen view coverage
 
-Status: implemented (harness `eval/run_v2.py`), smoke-tested, not yet run. Supersedes nothing; v1 (the current eval) stays runnable. Deviations and choices made during implementation are recorded in "Implementation notes" at the end.
+Status: implemented (harness `eval/run_v2.py`) and run in full on 2026-10-29; results in `docs/steelman-v2-results.md`. The thesis, falsifiers, and expectations below are unchanged from before the run. Supersedes nothing; v1 (the current eval) stays runnable. Deviations and choices made during implementation are recorded in "Implementation notes" at the end.
 
 ## Why v1 is not a steelman test
 
