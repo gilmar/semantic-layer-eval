@@ -265,3 +265,7 @@ The v2 results point at tests this toy cannot run:
 - multi-hop joins.
 
 Two known harness issues can be fixed and re-scored from the saved transcripts without new API calls: a breakdown check that was too strict, and a missing fingerprint on the paying-share question.
+
+## License
+
+MIT. See `LICENSE`.
