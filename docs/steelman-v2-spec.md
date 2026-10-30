@@ -32,7 +32,7 @@ Any of these is a publishable result. The spec is designed so that whichever hol
 
 **R3. Questions are written after artifacts are frozen**, by someone who does not edit `db/schema.py` or `cube/model`. Record the freeze commit in this file when it happens.
 
-Freeze: not yet committed. Not met as written: the questions were fixed in this spec before the artifacts were built, but the same author wrote both. Commit the artifacts before the first run and record the hash here.
+Freeze: artifacts (`db/schema.py`, `cube/model`, `data/`) frozen at commit `19a6fe4`. Any later change to them before the first run must be recorded here. Not met as written: the questions were fixed in this spec before the artifacts were built, but the same author wrote both.
 
 **R4. Perfect retrieval stays.** The documented arms still get the whole catalog in the prompt. Imperfect retrieval would bias toward the thesis.
 
