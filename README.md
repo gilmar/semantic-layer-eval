@@ -183,7 +183,7 @@ Answers are scored `correct`, `silent_wrong`, or `loud_error`. The report evalua
 - F3: the layer cannot compose an undefined ratio.
 
 ```
-uv run python eval/run_v2.py                     # first pass: 1,296 episodes, about $7.50
+uv run python eval/run_v2.py                     # full run: 3,240 episodes, about $23
 uv run python eval/run_v2.py --model openai/gpt-6-luna --lang en --runs 1   # smoke, about $0.02
 ```
 

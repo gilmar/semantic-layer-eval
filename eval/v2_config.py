@@ -4,27 +4,30 @@ Models, pricing, provider routing, sampling, and the Cube endpoint are
 shared with v1 (eval/config.py) so both versions price and route every
 model identically. Everything specific to v2 lives here.
 
-First-pass volume with the defaults below (about $7.50 at list rates,
-estimated from smoke-run costs per model, mode, and arm):
-  single-shot: 8 questions x 4 arms x 4 models x 2 languages x 3 runs = 768 calls
-  agentic:     (8 x 2 + 3 x 2) arm cells x 4 models x 2 languages x 3 runs = 528 episodes
+Full-run volume with the defaults below (about $23 at list rates; see the
+spec's "Volume and cost"):
+  single-shot: 8 questions x 4 arms x 6 models x 2 languages x 5 runs = 1,920 calls
+  agentic:     (8 x 2 + 3 x 2) arm cells x 6 models x 2 languages x 5 runs = 1,320 episodes
+
+The spec's cheaper first pass (Sonnet, Haiku, Luna, gpt-oss-20b at three
+runs, about $7.50) is the same run filtered with --model and --runs 3.
 """
 
 import config as v1
 
 LANGUAGES = ["en", "pt"]
 
-# First pass per the spec: the capability gradient at four models, three
-# runs per cell. Add "openai/gpt-6.1-terra" and "openai/gpt-6.1-sol" (and
-# raise N_RUNS to 5) for the full run. Every model must be priced in
-# eval/config.py.
+# Full run: the whole capability gradient, both vendors, five runs per
+# cell. Every model must be priced in eval/config.py.
 MODELS = [
     "anthropic/claude-sonnet-4.6",
+    "openai/gpt-6.1-sol",
     "anthropic/claude-haiku-4.5",
+    "openai/gpt-6.1-terra",
     "openai/gpt-6-luna",
     "openai/gpt-oss-20b",
 ]
-N_RUNS = 3
+N_RUNS = 5
 
 # Agentic mode: tool calls allowed before the harness forces an answer.
 MAX_TOOL_CALLS = 8
